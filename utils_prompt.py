@@ -12,6 +12,7 @@ def get_question_text(problem):
 
 def get_context_text(problem, use_caption):
     txt_context = problem['hint']
+    print("use_caption:", use_caption)
     img_context = problem['caption'] if use_caption else ""
     context = " ".join([txt_context, img_context]).strip()
     if context == "":

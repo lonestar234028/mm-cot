@@ -44,6 +44,7 @@ def parse_args():
     parser.add_argument('--eval_le', type=str, default=None, help='generated rationale for the dev set')
     parser.add_argument('--test_le', type=str, default=None, help='generated rationale for the test set')
     parser.add_argument('--evaluate_dir', type=str, default=None, help='the directory of model for evaluation')
+    parser.add_argument('--res_file', type=str, default=None, help='res_file')
     parser.add_argument('--caption_file', type=str, default='data/captions.json')
     parser.add_argument('--use_caption', action='store_true', help='use image captions or not')
     parser.add_argument('--prompt_format', type=str, default='QCM-A', help='prompt format template',
@@ -70,7 +71,7 @@ def T5Trainer(
     problems = dataframe['problems']
     qids = dataframe['qids']
     train_qids = qids['train']
-    test_qids = qids['test']
+    test_qids = qids['test'][:10]
     val_qids = qids['val']
     
     if args.evaluate_dir is not None:
@@ -268,7 +269,8 @@ def T5Trainer(
     if args.evaluate_dir is None:
         trainer.train()
         trainer.save_model(save_dir)
-        
+    print("test_set:", len(test_set))
+    print("test_set:", test_set[0])
     metrics = trainer.evaluate(eval_dataset = test_set)
     trainer.log_metrics("test", metrics)
     trainer.save_metrics("test", metrics)
@@ -317,7 +319,11 @@ def T5Trainer(
                 "scores": scores,
                 "preds": preds,
                  "labels": targets}
-        output_prediction_file = os.path.join(save_dir,"predictions_ans_test.json")
+        if args.res_file is not None:
+            output_prediction_file = os.path.join(save_dir, args.res_file)
+        else:
+            output_prediction_file = os.path.join(save_dir,"predictions_ans_test.json")
+
         with open(output_prediction_file, "w") as writer:
             writer.write(json.dumps(output_data, indent=4))
     

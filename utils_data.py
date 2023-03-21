@@ -154,6 +154,7 @@ class ScienceQADatasetImg(Dataset):
             source_text (str): column name of source text
             target_text (str): column name of target text
         """
+        print("ScienceQADatasetImg: init")
         self.tokenizer = tokenizer
         self.data = {qid : problems[qid] for qid in qids}
         self.source_len = source_len
@@ -173,6 +174,7 @@ class ScienceQADatasetImg(Dataset):
             else:
                 curr_le_data = None
             prompt, target = build_train_pair(problems, qid, args, curr_le_data)
+            print("built prompt:", prompt)
             self.target_text.append(target)
             self.source_text.append(prompt)
             if str(qid) in name_maps:
@@ -197,7 +199,7 @@ class ScienceQADatasetImg(Dataset):
         # cleaning data so as to ensure data is in string type
         source_text = " ".join(source_text.split())
         target_text = " ".join(target_text.split())
-
+        print("one source_text:", source_text)
         source = self.tokenizer.batch_encode_plus(
             [source_text],
             max_length=self.source_len,
@@ -222,6 +224,7 @@ class ScienceQADatasetImg(Dataset):
         
         return {
             "input_ids": source_ids,
+            "input_ids2": source_ids,
             "attention_mask": source_mask,
             "image_ids": image_ids,
             "labels": target_ids,

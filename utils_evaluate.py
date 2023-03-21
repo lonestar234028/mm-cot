@@ -26,7 +26,7 @@ def get_scores(result_data, rationale_data, results_reference, data_file):
     # read result file
     results = result_data
     num = len(results)
-    assert num == 4241
+    # assert num == 4241
     #print("number of questions:", num)
 
     # read data file
@@ -45,6 +45,8 @@ def get_scores(result_data, rationale_data, results_reference, data_file):
         res_pd.loc[index, 'has_text_image'] = True if (row['hint'] and row['image']) else False
 
         label = row['answer']
+        if index not in results:
+            continue
         pred = int(results[index])
         res_pd.loc[index, 'pred'] = pred
         res_pd.loc[index, 'true_false'] = (label == pred)
@@ -64,7 +66,13 @@ def get_scores(result_data, rationale_data, results_reference, data_file):
     rouge = caculate_rouge(rationale_data, results_reference)
 
     ## Similarity
-    model = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2').cuda()
+    
+    import torch
+    if torch.cuda.device_count() > 0:
+        model = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2').cuda()
+    else: 
+        model = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
+
     similariry = caculate_similariry(rationale_data, results_reference, model)
 
     scores = {
