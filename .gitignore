@@ -1,5 +1,6 @@
 **/.DS_Store
 .ipynb_checkpoints/
- __MACOSX/
- __pycache__/
+__MACOSX/
+__pycache__/
+vision_features/
 *.log
