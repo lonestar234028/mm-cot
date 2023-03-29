@@ -22,6 +22,7 @@ import evaluate
 
 def parse_args():
     parser = argparse.ArgumentParser()
+    parser.add_argument('--is_test', type=str,default=None, help='is test')
     parser.add_argument('--data_root', type=str, default='data')
     parser.add_argument('--output_dir', type=str, default='experiments')
     parser.add_argument('--model', type=str, default='allenai/unifiedqa-t5-base')
@@ -36,7 +37,7 @@ def parse_args():
     parser.add_argument('--train_split', type=str, default='train', choices=['train', 'trainval', 'minitrain'])
     parser.add_argument('--val_split', type=str, default='val', choices=['test', 'val', 'minival'])
     parser.add_argument('--test_split', type=str, default='test', choices=['test', 'minitest'])
-    
+    parser.add_argument('--res_file', type=str, default=None, help='res_file')
     parser.add_argument('--use_generate', action='store_true', help='only for baseline to improve inference speed')
     parser.add_argument('--final_eval', action='store_true', help='only evaluate the model at the final epoch')
     parser.add_argument('--user_msg', type=str, default="baseline", help='experiment type in the save_dir')
@@ -317,7 +318,11 @@ def T5Trainer(
                 "scores": scores,
                 "preds": preds,
                  "labels": targets}
-        output_prediction_file = os.path.join(save_dir,"predictions_ans_test.json")
+        
+        if args.res_file is not None:
+            output_prediction_file = os.path.join(save_dir, args.res_file)
+        else:
+            output_prediction_file = os.path.join(save_dir,"predictions_ans_test.json")
         with open(output_prediction_file, "w") as writer:
             writer.write(json.dumps(output_data, indent=4))
     

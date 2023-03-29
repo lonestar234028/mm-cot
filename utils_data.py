@@ -154,7 +154,6 @@ class ScienceQADatasetImg(Dataset):
             source_text (str): column name of source text
             target_text (str): column name of target text
         """
-        print("ScienceQADatasetImg: init")
         self.tokenizer = tokenizer
         self.data = {qid : problems[qid] for qid in qids}
         self.source_len = source_len
@@ -162,18 +161,28 @@ class ScienceQADatasetImg(Dataset):
         self.target_text = []
         self.source_text = []
         self.image_ids = []
+        self.cps = {}
         if test_le is not None:
             test_le_data =json.load(open(test_le))["preds"]
         else:
             test_le_data = None
+        if args.cp_file is not None:
+            cps =json.load(open( args.cp_file))
         idx = 0
+        cpns = 0
         for qid in self.data:
             if test_le_data is not None:
                 curr_le_data = test_le_data[idx]
                 idx += 1
             else:
                 curr_le_data = None
-            prompt, target = build_train_pair(problems, qid, args, curr_le_data)
+            if qid in cps:
+                curr_cps = cps[qid]
+                cpns += 1
+            else:
+                curr_cps = None
+            # prompt, target = build_train_pair(problems, qid, args, curr_le_data, curr_cps)
+            prompt, target = build_train_pairs(problems, qid, args, curr_le_data, curr_cps)
             print("built prompt:", prompt)
             self.target_text.append(target)
             self.source_text.append(prompt)
@@ -183,7 +192,8 @@ class ScienceQADatasetImg(Dataset):
             else:
                 shape = img_shape[args.img_type]
                 self.image_ids.append(np.zeros(shape))
-    
+        print("found ScienceQADatasetImg contains rationales:",idx)
+        print("found ScienceQADatasetImg contains captions:",cpns)
     def __len__(self):
         """returns the length of dataframe"""
 
@@ -197,17 +207,30 @@ class ScienceQADatasetImg(Dataset):
         image_ids = self.image_ids[index]
 
         # cleaning data so as to ensure data is in string type
-        source_text = " ".join(source_text.split())
+        # source_text = " ".join(source_text.split())
+        source_text = self.source_text[index]
+        print("source_text:", source_text)
         target_text = " ".join(target_text.split())
-        print("one source_text:", source_text)
-        source = self.tokenizer.batch_encode_plus(
-            [source_text],
+        x = self.tokenizer.batch_encode_plus(
+            source_text,
             max_length=self.source_len,
             pad_to_max_length=True,
             truncation=True,
             padding="max_length",
             return_tensors="pt",
         )
+        for k,v in x.items():
+            print("batch_encode_plus:", k, v.shape)
+        for src in source_text:
+            print("one source_text:", src)
+            source = self.tokenizer.batch_encode_plus(
+                [src],
+                max_length=self.source_len,
+                pad_to_max_length=True,
+                truncation=True,
+                padding="max_length",
+                return_tensors="pt",
+            )
         target = self.tokenizer.batch_encode_plus(
             [target_text],
             max_length=self.summ_len,

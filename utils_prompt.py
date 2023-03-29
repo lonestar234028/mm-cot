@@ -12,12 +12,68 @@ def get_question_text(problem):
 
 def get_context_text(problem, use_caption):
     txt_context = problem['hint']
-    print("use_caption:", use_caption)
     img_context = problem['caption'] if use_caption else ""
     context = " ".join([txt_context, img_context]).strip()
     if context == "":
         context = "N/A"
     return context
+
+def valid_prompt(cp, dedpue):
+    if cp in dedpue:
+        return False
+    
+    for x in cp.split(' '):
+        if len(x) == 1:
+            return False
+    dedpue[cp] = 1
+
+    return True
+
+def get_image_context(current_cps):
+    kkkk = 0
+    y = ""
+    if current_cps is None:
+        return y
+    dedupe = {}
+    for cp in current_cps:
+        if not valid_prompt(cp, dedupe):
+            continue
+        y += "Figure: "+ cp + ' '
+        kkkk += 1
+        if kkkk > 3:
+            break
+    return y
+
+def get_image_contexts(current_cps):
+    kkkk = 0
+    y = []
+    if current_cps is None:
+        return y
+    dedupe = {}
+    for cp in current_cps:
+        if not valid_prompt(cp, dedupe):
+            continue
+        y.append("Figure: "+ cp)
+        kkkk += 1
+        if kkkk > 3:
+            break
+    return y
+
+def get_context_text1(problem, current_cps):
+    txt_context = problem['hint']
+    img_context = get_image_context(current_cps)
+    if len(img_context) > 0:
+        print("img_context:",img_context)
+    context = " ".join([txt_context, img_context]).strip()
+    if context == "":
+        context = "N/A"
+    return context
+
+def get_context_text2(problem, current_cps):
+    txt_context = [problem['hint']]
+    img_context = get_image_contexts(current_cps)
+    txt_context.extend(img_context)
+    return txt_context
 
 
 def get_choice_text(probelm, options):
@@ -64,6 +120,7 @@ def create_one_example(format, question, context, choice, answer, lecture, solut
     elif input_format == "QCMG":
         if curr_le_data is not None:
             input = f"Question: {question}\nContext: {context}\nOptions: {choice}\n{curr_le_data}\n"
+            # print("curr_le_data:",curr_le_data)
         else:
             input = f"Question: {question}\nContext: {context}\nOptions: {choice}\nSolution: {lecture} {solution}\n"
     elif input_format == "CQMG":
@@ -193,13 +250,14 @@ def build_prompt(problems, shot_qids, test_qid, args):
 
     return prompt_input
 
-def build_train_pair(problems, test_qid, args, curr_le_data=None):
+def build_train_pair(problems, test_qid, args, curr_le_data=None, curr_cps=None):
 
     examples = []
 
     # test example
     question = get_question_text(problems[test_qid])
     context = get_context_text(problems[test_qid], args.use_caption)
+    # context = get_context_text1(problems[test_qid], curr_cps)
     choice = get_choice_text(problems[test_qid], args.options)
     
     lecture = get_lecture_text(problems[test_qid])
@@ -222,7 +280,41 @@ def build_train_pair(problems, test_qid, args, curr_le_data=None):
     target = target.replace("Answer:", "").strip()
     # create the prompt input
     prompt_input = '\n\n'.join(examples)
+    print("lens of input when build_train_pair: ", len(prompt_input))
+    return prompt_input, target
 
+def build_train_pairs(problems, test_qid, args, curr_le_data=None, curr_cps=None):
+
+    examples = []
+
+    # test example
+    question = get_question_text(problems[test_qid])
+    # context = get_context_text(problems[test_qid], args.use_caption)
+    context = get_context_text2(problems[test_qid], curr_cps)
+    choice = get_choice_text(problems[test_qid], args.options)
+    
+    lecture = get_lecture_text(problems[test_qid])
+    solution = get_solution_text(problems[test_qid])
+
+    # answer_text = get_origin_answer(problems[test_qid], args.options)
+    answer_option = get_answer(problems[test_qid], args.options)
+    answer = "(" + answer_option + ")"
+    for x in context:
+        test_example, target = create_one_example(args.prompt_format,
+                                        question,
+                                        x,
+                                        choice,
+                                        answer,
+                                        lecture,
+                                        solution,
+                                        test_example=False,WithOutput = True, curr_le_data=curr_le_data)
+        examples.append(test_example)
+    
+    target = target.replace("Answer:", "").strip()
+    # create the prompt input
+    # prompt_input = '\n\n'.join(examples)
+    prompt_input = examples
+    print("lens of input when build_train_pairs: ", len(prompt_input))
     return prompt_input, target
 
 @dataclass(frozen=True)

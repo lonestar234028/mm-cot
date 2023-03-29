@@ -47,6 +47,8 @@ def parse_args():
     parser.add_argument('--res_file', type=str, default=None, help='res_file')
     parser.add_argument('--caption_file', type=str, default='data/captions.json')
     parser.add_argument('--use_caption', action='store_true', help='use image captions or not')
+    parser.add_argument('--is_test', type=str,default=None, help='is test') 
+    parser.add_argument('--cp_file', type=str,default=None, help='cp_file')
     parser.add_argument('--prompt_format', type=str, default='QCM-A', help='prompt format template',
                         choices=['QCM-A', 'QCM-LE', 'QCMG-A', 'QCM-LEA', 'QCM-ALE'])
     parser.add_argument('--seed', type=int, default=42, help='random seed')
@@ -71,6 +73,7 @@ def T5Trainer(
     problems = dataframe['problems']
     qids = dataframe['qids']
     train_qids = qids['train']
+    test_qids = qids['test']
     test_qids = qids['test'][:10]
     val_qids = qids['val']
     
@@ -271,6 +274,7 @@ def T5Trainer(
         trainer.save_model(save_dir)
     print("test_set:", len(test_set))
     print("test_set:", test_set[0])
+    print("args.is_test:", args.is_test)
     metrics = trainer.evaluate(eval_dataset = test_set)
     trainer.log_metrics("test", metrics)
     trainer.save_metrics("test", metrics)
@@ -299,6 +303,10 @@ def T5Trainer(
         for idx, qid in enumerate(test_qids):
             pred = preds[int(idx)]
             ref = targets[int(idx)]
+            print("pred:", pred)
+            print("ref:", ref)
+            # pred: The answer is (A).
+            # ref: The answer is (B).
             extract_pred = extract_ans(pred)
             if extract_pred != "FAILED":
                 if extract_pred in args.options:
