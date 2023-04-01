@@ -183,7 +183,7 @@ class ScienceQADatasetImg(Dataset):
                 curr_cps = None
             # prompt, target = build_train_pair(problems, qid, args, curr_le_data, curr_cps)
             prompt, target = build_train_pairs(problems, qid, args, curr_le_data, curr_cps)
-            print("built prompt:", prompt)
+            # print("built prompt:", prompt)
             self.target_text.append(target)
             self.source_text.append(prompt)
             if str(qid) in name_maps:
@@ -209,28 +209,39 @@ class ScienceQADatasetImg(Dataset):
         # cleaning data so as to ensure data is in string type
         # source_text = " ".join(source_text.split())
         source_text = self.source_text[index]
-        print("source_text:", source_text)
+        print("source_text:", len(source_text))
         target_text = " ".join(target_text.split())
-        x = self.tokenizer.batch_encode_plus(
-            source_text,
-            max_length=self.source_len,
-            pad_to_max_length=True,
-            truncation=True,
-            padding="max_length",
-            return_tensors="pt",
-        )
-        for k,v in x.items():
-            print("batch_encode_plus:", k, v.shape)
-        for src in source_text:
-            print("one source_text:", src)
-            source = self.tokenizer.batch_encode_plus(
-                [src],
-                max_length=self.source_len,
-                pad_to_max_length=True,
-                truncation=True,
-                padding="max_length",
-                return_tensors="pt",
-            )
+        
+        others = []
+        other_mask = []
+        for i, src in enumerate(source_text):
+            print("one source_text:", len(src))
+            if i == 0:
+                source = self.tokenizer.batch_encode_plus(
+                    [src],
+                    max_length=self.source_len,
+                    pad_to_max_length=True,
+                    truncation=True,
+                    padding="max_length",
+                    return_tensors="pt",
+                )
+            other = self.tokenizer.batch_encode_plus(
+                    [src],
+                    max_length=self.source_len,
+                    pad_to_max_length=True,
+                    truncation=True,
+                    padding="max_length",
+                    return_tensors="pt",
+                )
+           
+            # print("others:",other["input_ids"].squeeze().shape)
+            # print("other_mask:",other["attention_mask"].squeeze().shape)
+            # print("others:",other["input_ids"].shape)
+            # print("other_mask:",other["attention_mask"].shape)
+
+            others.append(other["input_ids"].squeeze())
+            other_mask.append(other["attention_mask"].squeeze())
+
         target = self.tokenizer.batch_encode_plus(
             [target_text],
             max_length=self.summ_len,
@@ -244,10 +255,12 @@ class ScienceQADatasetImg(Dataset):
         target_ids = target["input_ids"].squeeze().tolist()
 
         image_ids = torch.tensor(image_ids).squeeze()
-        
+        alls = others
+        all_mask = other_mask
         return {
             "input_ids": source_ids,
-            "input_ids2": source_ids,
+            "alls": alls,
+            "all_mask": all_mask,
             "attention_mask": source_mask,
             "image_ids": image_ids,
             "labels": target_ids,

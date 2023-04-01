@@ -314,7 +314,8 @@ def build_train_pairs(problems, test_qid, args, curr_le_data=None, curr_cps=None
     # create the prompt input
     # prompt_input = '\n\n'.join(examples)
     prompt_input = examples
-    print("lens of input when build_train_pairs: ", len(prompt_input))
+    if len(prompt_input) > 1:
+        print("lens of input when build_train_pairs: ", len(prompt_input))
     return prompt_input, target
 
 @dataclass(frozen=True)

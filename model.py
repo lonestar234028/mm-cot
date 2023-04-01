@@ -62,7 +62,15 @@ class T5ForMultimodalGeneration(T5ForConditionalGeneration):
         # Model parallel
         self.model_parallel = False
         self.device_map = None
-
+        
+    def merge(self, hidden_states, image_ids):
+        image_embedding = self.image_dense(image_ids)
+        image_att, _ = self.mha_layer(hidden_states, image_embedding, image_embedding)
+        merge = torch.cat([hidden_states, image_att], dim=-1)
+        gate = self.sigmoid(self.gate_dense(merge))
+        hidden_states = (1 - gate) * hidden_states + gate * image_att
+        return hidden_states
+    
     def forward(
         self,
         input_ids: Optional[torch.LongTensor] = None,
@@ -82,12 +90,16 @@ class T5ForMultimodalGeneration(T5ForConditionalGeneration):
         output_attentions: Optional[bool] = None,
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
-        input_ids2: Optional[torch.LongTensor] = None,
+        alls = None,
+        all_mask = None,
     ) -> Union[Tuple[torch.FloatTensor], Seq2SeqLMOutput]:
         use_cache = use_cache if use_cache is not None else self.config.use_cache
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
-        print("input_ids.shape", input_ids.shape)
-        print("input_ids2.shape", input_ids2.shape)
+        print("forward input_ids.shape:", input_ids.shape)
+        print("forward alls:", (alls.shape))
+        print("forward all_mask:", (all_mask.shape))
+        print("forward alls.squeeze(0):", (alls.squeeze(0).shape))
+        print("forward all_mask.squeeze(0):", (all_mask.squeeze(0).shape))
         # FutureWarning: head_mask was separated into two input args - head_mask, decoder_head_mask
         if head_mask is not None and decoder_head_mask is None:
             if self.config.num_layers == self.config.num_decoder_layers:
@@ -106,7 +118,18 @@ class T5ForMultimodalGeneration(T5ForConditionalGeneration):
                 output_hidden_states=output_hidden_states,
                 return_dict=return_dict,
             )
-
+            encoder_outputs_new = self.encoder(
+                input_ids=alls.squeeze(0),
+                attention_mask=all_mask.squeeze(0),
+                inputs_embeds=inputs_embeds,
+                head_mask=head_mask,
+                output_attentions=output_attentions,
+                output_hidden_states=output_hidden_states,
+                return_dict=return_dict,
+            )
+            print("encoder_outputs,",encoder_outputs['last_hidden_state'].shape)
+            print("encoder_outputs_new,",encoder_outputs_new['last_hidden_state'].shape)
+            # print("encoder_outputs_new,",encoder_outputs_new[0].shape)
         elif return_dict and not isinstance(encoder_outputs, BaseModelOutput):
             encoder_outputs = BaseModelOutput(
                 last_hidden_state=encoder_outputs[0],
@@ -116,22 +139,23 @@ class T5ForMultimodalGeneration(T5ForConditionalGeneration):
 
 
         hidden_states = encoder_outputs[0]
-        
-        image_embedding = self.image_dense(image_ids)
-        image_att, _ = self.mha_layer(hidden_states, image_embedding, image_embedding)
-
-        merge = torch.cat([hidden_states, image_att], dim=-1)
-        gate = self.sigmoid(self.gate_dense(merge))
-        hidden_states = (1 - gate) * hidden_states + gate * image_att
+        hidden_states = self.merge(hidden_states, image_ids)
+        new_hidden_states = []
+        for x in encoder_outputs_new['last_hidden_state']:
+            # print("x.shape:",x.unsqueeze(0).shape)
+            new_hidden_states.append(self.merge(x.unsqueeze(0), image_ids))
         print("hidden_states before:",hidden_states.shape)
-        hidden_states = torch.cat((hidden_states, hidden_states), dim=1)
+        print("attention_mask before:",attention_mask.shape)
+        new_hidden_states = torch.cat(new_hidden_states, dim = 1)
+        hidden_states = new_hidden_states
+        new_mask = all_mask.view(1, -1)
+        attention_mask = new_mask
         print("hidden_states after:",hidden_states.shape)
+        print("attention_mask after:",attention_mask.shape)
+
         if self.model_parallel:
             torch.cuda.set_device(self.decoder.first_device)
-        if attention_mask is not None:
-            print("attention_mask before:",attention_mask.shape)
-            attention_mask = torch.cat((attention_mask, attention_mask), dim=1)
-            print("attention_mask after:",attention_mask.shape)
+       
 
         if labels is not None and decoder_input_ids is None and decoder_inputs_embeds is None:
             # get decoder inputs from shifting lm labels to the right
